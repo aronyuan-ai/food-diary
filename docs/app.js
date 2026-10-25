@@ -286,9 +286,45 @@ async function viewStore(id) {
   $('#visits').innerHTML = (vs || []).map(x => `<li><span class="d">${esc(x.visited_on)}${x.source === 'fb' ? ' <span class="tag green">FB</span>' : ''}</span>${x.snippet ? `<span class="t clip">${esc(x.snippet)}</span>` : ''}</li>`).join('') || '<li class="muted">還沒有造訪紀錄。</li>';
   $('#visits').onclick = e => { const t = e.target.closest('.t'); if (t) t.classList.toggle('clip'); };
   if (ph && ph.length) {
-    const { data: urls } = await sb.storage.from('photos').createSignedUrls(ph.map(p => p.path), 3600);
-    $('#phSec').hidden = false; $('#photos').innerHTML = (urls || []).filter(u => u.signedUrl).map(u => `<a href="${u.signedUrl}" target="_blank" rel="noopener"><img src="${u.signedUrl}" alt="" loading="lazy"></a>`).join('');
+    ph.sort((a, b) => (b.is_cover - a.is_cover) || (b.taken_on || '').localeCompare(a.taken_on || '') || a.sort - b.sort);
+    const { data: urls } = await sb.storage.from('photos').createSignedUrls([...new Set(ph.map(p => p.path))], 3600);
+    const url = new Map((urls || []).map(u => [u.path, u.signedUrl]));
+    $('#phSec').hidden = false;
+    $('#photos').innerHTML = ph.map((p, i) => url.get(p.path) ? `<button type="button" class="ph" data-i="${i}" aria-label="查看照片"><img src="${url.get(p.path)}" alt="" loading="lazy">${p.is_cover ? '<span class="tag green cov">封面</span>' : ''}</button>` : '').join('');
+    const cover = ph.find(p => p.is_cover) || ph[0];
+    if (url.get(cover.path)) { const h = $('.hero'); h.style.backgroundImage = `linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.65)),url("${url.get(cover.path)}")`; h.classList.add('has-photo'); }
+    $('#photos').onclick = e => { const b = e.target.closest('.ph'); if (b) viewer(s, ph, +b.dataset.i, url); };
   }
+}
+function viewer(s, ph, i, url) {
+  const p = ph[i]; const d = document.createElement('div'); d.className = 'viewer'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-label', '照片');
+  d.innerHTML = `<img src="${url.get(p.path)}" alt=""><div class="vbar">
+    <button class="btn" type="button" data-a="prev" ${i ? '' : 'disabled'}>‹</button>
+    <button class="btn" type="button" data-a="cover" ${p.is_cover ? 'disabled' : ''}>${p.is_cover ? '目前的封面' : '設為封面'}</button>
+    <button class="btn danger" type="button" data-a="del">刪除</button>
+    <button class="btn" type="button" data-a="close">關閉</button>
+    <button class="btn" type="button" data-a="next" ${i < ph.length - 1 ? '' : 'disabled'}>›</button></div>
+    <p class="vnote">${esc(p.taken_on || '')}　如果這張不是這家店的，可以刪除</p>`;
+  document.body.appendChild(d);
+  const close = () => d.remove();
+  d.onclick = async e => {
+    const a = e.target.closest('[data-a]')?.dataset.a; if (!a && e.target === d) return close(); if (!a) return;
+    if (a === 'close') return close();
+    if (a === 'prev' || a === 'next') { close(); return viewer(s, ph, i + (a === 'next' ? 1 : -1), url); }
+    if (a === 'cover') {
+      await sb.from('photos').update({ is_cover: false }).eq('store_id', s.id).eq('is_cover', true);
+      const { error } = await sb.from('photos').update({ is_cover: true }).eq('id', p.id);
+      if (error) return toast('設定失敗：' + error.message); close(); toast('已設為封面'); viewStore(s.id);
+    }
+    if (a === 'del') {
+      const btn = e.target.closest('button'); if (btn.dataset.sure !== '1') { btn.dataset.sure = '1'; btn.textContent = '再按一次確認刪除'; return; }
+      const { error } = await sb.from('photos').delete().eq('id', p.id); if (error) return toast('刪除失敗：' + error.message);
+      const { data: still } = await sb.from('photos').select('id').eq('path', p.path).limit(1);
+      if (!still || !still.length) await sb.storage.from('photos').remove([p.path]);
+      close(); toast('已刪除'); viewStore(s.id);
+    }
+  };
+  const key = e => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', key); } }; document.addEventListener('keydown', key);
 }
 function editStore(s) {
   const sec = $('#editSec'); sec.hidden = !sec.hidden; if (sec.hidden) return;
@@ -405,11 +441,59 @@ function viewSettings() {
     <div class="card"><div class="stat"><div><b>${vis.length}</b><span>家店</span></div><div><b>${conf}</b><span>已確認</span></div><div><b>${rated}</b><span>已評分</span></div></div></div>
     <div class="card"><h3>匯入資料</h3><p class="muted" style="margin:0 0 10px;font-size:14px">選擇 Claude 給你的匯入檔（.json）。重複匯入不會產生重複資料。</p>
       <input type="file" id="imp" accept=".json,application/json"><div class="progress" style="margin-top:10px" hidden id="impBar"><i></i></div><p class="msg" id="impMsg"></p></div>
+    <div class="card"><h3>從 FB 匯出檔匯入照片</h3><p class="muted" style="margin:0 0 10px;font-size:14px">請用電腦的 Chrome 或 Edge。先選照片對照檔，再選 FB 匯出檔解壓縮後的資料夾。照片會在你的電腦上壓縮後直接上傳；已上傳的會自動跳過，中斷了可以重跑。</p>
+      <label class="field"><span>1. 照片對照檔（.json）</span><input type="file" id="phMap" accept=".json,application/json"></label>
+      <label class="field" style="margin-top:8px"><span>2. FB 匯出檔資料夾</span><input type="file" id="phDir" webkitdirectory directory multiple disabled></label>
+      <div class="progress" style="margin-top:10px" hidden id="phBar"><i></i></div><p class="msg" id="phMsg"></p></div>
     <div class="card"><h3>帳號</h3><p style="margin:0 0 10px;font-size:14px">${esc(S.user.email)}</p><div class="actions"><button class="btn" id="reload" type="button">重新同步</button><button class="btn danger" id="out" type="button">登出</button></div></div>
     <p class="muted" style="font-size:12px;text-align:center">地圖與地點資料 © Google・行政區資料 © OpenStreetMap contributors</p></div>`;
   $('#out').onclick = () => sb.auth.signOut();
   $('#reload').onclick = () => loadStores(true).then(() => toast('已同步'));
   $('#imp').onchange = e => importFile(e.target.files[0]);
+  let phMap = null;
+  $('#phMap').onchange = async e => {
+    const m = $('#phMsg'); m.className = 'msg';
+    try { phMap = JSON.parse(await e.target.files[0].text()); if (!Array.isArray(phMap.items)) throw 0; $('#phDir').disabled = false; m.className = 'msg ok'; m.textContent = `對照檔有 ${phMap.items.length} 張照片。接著選 FB 匯出檔的資料夾。`; }
+    catch (err) { m.textContent = '這不是照片對照檔，請確認選的是 Claude 給你的檔案。'; }
+  };
+  $('#phDir').onchange = e => phMap && importPhotos(phMap, [...e.target.files]);
+}
+async function importPhotos(map, files) {
+  const m = $('#phMsg'), bar = $('#phBar'), fill = bar.firstElementChild; m.className = 'msg ok'; bar.hidden = false;
+  // 用路徑最後三段比對：media/<相簿>/<檔名>
+  const key = p => p.split('/').slice(-3).join('/');
+  const byKey = new Map(files.map(f => [key(f.webkitRelativePath || f.name), f]));
+  const items = map.items.filter(it => S.byId.has(it.store_id));
+  m.textContent = '讀取已上傳的照片…';
+  const have = new Set(), visitOf = new Map();
+  for (let from = 0; ; from += 1000) { const { data, error } = await sb.from('photos').select('store_id,path').range(from, from + 999); if (error) { m.className = 'msg'; m.textContent = '讀取失敗：' + error.message; return; } data.forEach(r => have.add(r.store_id + '|' + r.path)); if (data.length < 1000) break; }
+  for (let from = 0; ; from += 1000) { const { data } = await sb.from('visits').select('id,store_id,fb_post_ts').not('fb_post_ts', 'is', null).range(from, from + 999); (data || []).forEach(v => visitOf.set(v.store_id + '|' + v.fb_post_ts, v.id)); if (!data || data.length < 1000) break; }
+  const uploaded = new Map(); // 同一張照片屬於多家店時只上傳一次
+  let done = 0, ok = 0, skip = 0, missing = 0, fail = 0;
+  const step = () => { done++; fill.style.width = (done / items.length * 100) + '%'; m.textContent = `處理中 ${done} / ${items.length}：新增 ${ok}、已有 ${skip}、資料夾裡找不到 ${missing}、失敗 ${fail}`; };
+  const queue = items.slice(); const workers = [];
+  for (let w = 0; w < 3; w++) workers.push((async () => {
+    while (queue.length) {
+      const it = queue.shift(); const base = it.uri.split('/').pop().replace(/\.\w+$/, '');
+      const path = `${S.user.id}/fb_${base}.webp`;
+      if (have.has(it.store_id + '|' + path)) { skip++; step(); continue; }
+      const f = byKey.get(key(it.uri)); if (!f) { missing++; step(); continue; }
+      try {
+        if (!uploaded.has(path)) {
+          uploaded.set(path, (async () => {
+            const blob = await shrink(f, 1280);
+            const { error } = await sb.storage.from('photos').upload(path, blob, { contentType: blob.type, upsert: true }); if (error) throw error;
+          })());
+        }
+        await uploaded.get(path);
+        const { error } = await sb.from('photos').insert({ store_id: it.store_id, visit_id: visitOf.get(it.store_id + '|' + it.fb_post_ts) || null, path, taken_on: it.date, sort: it.sort, is_cover: !!it.cover });
+        if (error) throw error; have.add(it.store_id + '|' + path); ok++;
+      } catch (err) { fail++; console.warn(it.uri, err); }
+      step();
+    }
+  })());
+  await Promise.all(workers);
+  m.textContent = `完成：新增 ${ok} 張、已有 ${skip} 張${missing ? `、資料夾裡找不到 ${missing} 張（請確認選的是 FB 匯出檔的最上層資料夾）` : ''}${fail ? `、失敗 ${fail} 張（可以再選一次資料夾重試）` : ''}。`;
 }
 async function importFile(file) {
   const m = $('#impMsg'), bar = $('#impBar'), fill = bar.firstElementChild; m.className = 'msg';
