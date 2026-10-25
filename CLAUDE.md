@@ -24,6 +24,7 @@
 | App | PWA，託管在 GitHub Pages（本 repo 的 `docs/`） |
 | 地圖與地點 | **Google**（使用者選 A 方案：地圖、地點搜尋都用 Google，已綁卡、免費額度內） |
 | 未確認的店 | 不強迫全部確認；App 裡標「未確認」，邊用邊修 |
+| 公開與否 | **維持需要登入**（2026-10-25 討論過開放唯讀：貼文全文含家人隱私、照片有人臉、公開會耗 Google／Supabase 額度，使用者決定不開放）。登入狀態靠 Supabase refresh token 長期保存，不需重複登入；iPhone 要從「加入主畫面」的 App 開才不會被 Safari 7 天清除 |
 
 ## 架構
 
