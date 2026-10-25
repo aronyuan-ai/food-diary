@@ -51,6 +51,7 @@ function starInput(value, onChange) {
 
 /* ---------- 登入 ---------- */
 let signUpMode = false;
+$('#pwEye').onclick = () => { const i = $('#authPw'), show = i.type === 'password'; i.type = show ? 'text' : 'password'; $('#pwEye').textContent = show ? '隱藏' : '顯示'; $('#pwEye').setAttribute('aria-pressed', show); $('#pwEye').setAttribute('aria-label', show ? '隱藏密碼' : '顯示密碼'); i.focus(); };
 function showAuth() { $('#auth').hidden = false; $('#shell').hidden = true; }
 $('#authToggle').onclick = () => { signUpMode = !signUpMode; $('#authGo').textContent = signUpMode ? '建立帳號' : '登入'; $('#authToggle').textContent = signUpMode ? '已經有帳號？登入' : '第一次使用？建立帳號'; $('#authMsg').textContent = ''; };
 $('#authForm').onsubmit = async e => {

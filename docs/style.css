@@ -153,3 +153,8 @@ textarea{min-height:96px;resize:vertical}
 /* 唯讀帳號：隱藏新增 */
 body.readonly .tabbar{grid-template-columns:repeat(4,1fr)}
 body.readonly .tabbar a.add{display:none}
+
+/* 顯示密碼 */
+.pw{position:relative;display:block}
+.pw input{padding-right:64px}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:var(--green-soft);color:var(--green);border-radius:6px;padding:6px 10px;font-size:13px;font-weight:700;cursor:pointer}
