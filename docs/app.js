@@ -8,7 +8,7 @@ const HUE = {小吃:18,麵食:35,咖啡甜點:330,中式料理:0,火鍋:8,燒肉
 const COUNTRIES = ['台灣','日本','韓國','香港','澳門','中國','越南','澳洲','其他'];
 const PAGE = 60;
 
-const S = { user: null, stores: [], byId: new Map(), loaded: false, q: '', f: { cu: '', area: '', rate: '', st: '', sort: 'recent' }, limit: PAGE, here: null };
+const S = { readonly: false, user: null, stores: [], byId: new Map(), loaded: false, q: '', f: { cu: '', area: '', rate: '', st: '', sort: 'recent' }, limit: PAGE, here: null };
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const color = cu => `hsl(${HUE[cu] ?? 150} 42% 38%)`;
@@ -95,6 +95,7 @@ async function loadStores(force) {
 }
 function setStores(arr) { S.stores = arr; S.byId = new Map(arr.map(s => [s.id, s])); S.loaded = true; route(); }
 async function saveStore(id, patch) {
+  if (S.readonly) { toast('這是唯讀帳號，不能修改'); return false; }
   const s = store(id); Object.assign(s, patch); lsSet('stores:' + S.user.id, S.stores);
   const { error } = await sb.from('stores').update(patch).eq('id', id);
   if (error) { toast('儲存失敗：' + error.message); return false; }
@@ -114,6 +115,7 @@ function loadGoogle() {
 }
 // Google 條款：座標最多快取 30 天。每次開啟 App 時，重新整理超過 25 天的（每次最多 150 家）。
 async function refreshGoogleCoords() {
+  if (S.readonly) return;
   const old = Date.now() - 25 * 864e5;
   const due = S.stores.filter(s => s.google_place_id && (!s.google_fetched_at || new Date(s.google_fetched_at).getTime() < old)).slice(0, 150);
   if (!due.length) return;
@@ -142,6 +144,7 @@ async function osmDistrict(lat, lng) { // 行政區用 OpenStreetMap 反查，�
 /* ---------- 路由 ---------- */
 window.addEventListener('hashchange', route);
 function route() {
+  document.querySelectorAll('.viewer').forEach(e => e.remove());
   if (!S.user || !S.loaded) return;
   const h = location.hash.slice(1) || '/';
   const [, a, b] = h.split('/');
@@ -152,7 +155,7 @@ function route() {
   if (a === 'magazine') return viewMagazine(b ?? null);
   if (a === 'print') return viewPrint(b || 'all');
   if (a === 'map') return viewMap();
-  if (a === 'add') return viewAdd(b ? decodeURIComponent(b) : null);
+  if (a === 'add') { if (S.readonly) { location.hash = '#/'; return; } return viewAdd(b ? decodeURIComponent(b) : null); }
   if (a === 'settings') return viewSettings();
   viewList();
 }
@@ -268,17 +271,18 @@ async function viewStore(id) {
   v.innerHTML = `<a class="back" href="#/" onclick="if(history.length>1){history.back();return false}">‹ 返回</a>
   <div class="hero" style="background:${color(s.cuisine)}">${s.status === 'unconfirmed' ? '<span class="stamp">未確認</span>' : ''}
     <div class="cu">${esc(s.cuisine || '')}</div><h2>${esc(s.name)}</h2><div class="where">${esc(where || '位置未填')}　${s.first_visit ? `${esc(s.first_visit)} 起・去過 ${s.visit_count} 次` : ''}</div></div>
-  <div class="sec"><h3>我的評分</h3><div id="rate"></div></div>
+  <div class="sec"><h3>${S.readonly ? '心肝的評分' : '我的評分'}</h3><div id="rate"></div></div>
   <div class="sec"><div class="actions">
     <a class="btn primary" href="${gmapsLink(s)}" target="_blank" rel="noopener">在 Google 地圖開啟</a>
-    <a class="btn" href="#/add/${encodeURIComponent(s.id)}">再訪一次</a>
-    <button class="btn" id="bEdit" type="button">修改資料</button></div>
+    ${S.readonly ? '' : `<a class="btn" href="#/add/${encodeURIComponent(s.id)}">再訪一次</a>
+    <button class="btn" id="bEdit" type="button">修改資料</button>`}</div>
     <dl class="kv" style="margin-top:12px" id="kv">${s.address ? `<dt>地址</dt><dd>${esc(s.address)}</dd>` : ''}${(s.aliases || []).length ? `<dt>其他寫法</dt><dd>${esc(s.aliases.join('、'))}</dd>` : ''}${s.note ? `<dt>筆記</dt><dd>${esc(s.note)}</dd>` : ''}</dl></div>
   <div class="sec" id="editSec" hidden></div>
   <div class="sec" id="phSec" hidden><h3>照片</h3><div class="photos" id="photos"></div></div>
   <div class="sec"><h3>造訪紀錄</h3><ul class="visits" id="visits"><li class="muted">載入中…</li></ul></div>`;
-  $('#rate').appendChild(starInput(s.rating, r => { saveStore(s.id, { rating: r }).then(ok => ok && toast(r ? `已評 ${r} 星` : '已清除評分')); }));
-  $('#bEdit').onclick = () => editStore(s);
+  if (S.readonly) $('#rate').innerHTML = s.rating ? `<span class="rate"><span class="stars">${[1, 2, 3, 4, 5].map(i => starSvg(s.rating >= i ? 1 : s.rating >= i - .5 ? .5 : 0)).join('')}</span><span class="val">${s.rating.toFixed(1)}</span></span>` : '<span class="muted">還沒評分</span>';
+  else $('#rate').appendChild(starInput(s.rating, r => { saveStore(s.id, { rating: r }).then(ok => ok && toast(r ? `已評 ${r} 星` : '已清除評分')); }));
+  if ($('#bEdit')) $('#bEdit').onclick = () => editStore(s);
   // Google 即時地址（不存）
   if (s.google_place_id && !s.address) loadGoogle().then(async () => {
     const { Place } = await google.maps.importLibrary('places'); const p = new Place({ id: s.google_place_id });
@@ -304,11 +308,11 @@ function viewer(s, ph, i, url) {
   const p = ph[i]; const d = document.createElement('div'); d.className = 'viewer'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-label', '照片');
   d.innerHTML = `<img src="${url.get(p.path)}" alt=""><div class="vbar">
     <button class="btn" type="button" data-a="prev" ${i ? '' : 'disabled'}>‹</button>
-    <button class="btn" type="button" data-a="cover" ${p.is_cover ? 'disabled' : ''}>${p.is_cover ? '目前的封面' : '設為封面'}</button>
-    <button class="btn danger" type="button" data-a="del">刪除</button>
+    ${S.readonly ? '' : `<button class="btn" type="button" data-a="cover" ${p.is_cover ? 'disabled' : ''}>${p.is_cover ? '目前的封面' : '設為封面'}</button>
+    <button class="btn danger" type="button" data-a="del">刪除</button>`}
     <button class="btn" type="button" data-a="close">關閉</button>
     <button class="btn" type="button" data-a="next" ${i < ph.length - 1 ? '' : 'disabled'}>›</button></div>
-    <p class="vnote">${esc(p.taken_on || '')}　如果這張不是這家店的，可以刪除</p>`;
+    <p class="vnote">${esc(p.taken_on || '')}${S.readonly ? '' : '　如果這張不是這家店的，可以刪除'}</p>`;
   document.body.appendChild(d);
   const close = () => d.remove();
   d.onclick = async e => {
@@ -441,6 +445,15 @@ async function shrink(file, max = 1600) {
 function viewSettings() {
   $('#topTitle').textContent = '更多';
   const vis = S.stores.filter(visible), conf = vis.filter(s => s.status === 'confirmed').length, rated = vis.filter(s => s.rating).length;
+  if (S.readonly) {
+    $('#view').innerHTML = `<div class="wrap page">
+      <div class="card"><div class="stat"><div><b>${vis.length}</b><span>家店</span></div><div><b>${conf}</b><span>已確認</span></div><div><b>${rated}</b><span>已評分</span></div></div></div>
+      <div class="card"><h3>帳號</h3><p style="margin:0 0 6px;font-size:14px">${esc(S.user.email)}</p><p class="muted" style="margin:0 0 10px;font-size:13px">這是唯讀帳號：可以瀏覽、搜尋、看地圖和美食指南，但不能新增或修改。</p><div class="actions"><button class="btn" id="reload" type="button">重新同步</button><button class="btn danger" id="out" type="button">登出</button></div></div>
+      <p class="muted" style="font-size:12px;text-align:center">地圖與地點資料 © Google・行政區資料 © OpenStreetMap contributors</p></div>`;
+    $('#out').onclick = () => sb.auth.signOut();
+    $('#reload').onclick = () => loadStores(true).then(() => toast('已同步'));
+    return;
+  }
   $('#view').innerHTML = `<div class="wrap page">
     <div class="card"><div class="stat"><div><b>${vis.length}</b><span>家店</span></div><div><b>${conf}</b><span>已確認</span></div><div><b>${rated}</b><span>已評分</span></div></div></div>
     <div class="card"><h3>匯入資料</h3><p class="muted" style="margin:0 0 10px;font-size:14px">選擇 Claude 給你的匯入檔（.json）。重複匯入不會產生重複資料。</p>
@@ -575,8 +588,11 @@ async function importFile(file) {
 /* ---------- 啟動 ---------- */
 async function start() {
   $('#auth').hidden = true; $('#shell').hidden = false;
+  // 唯讀檢視者：在 viewers 名單上的帳號只能看，不能改（資料庫權限也擋住寫入）
+  try { const { data, error } = await sb.from('viewers').select('owner_id').eq('viewer_id', S.user.id).limit(1); S.readonly = !error && !!(data && data.length); } catch (e) { S.readonly = false; }
+  document.body.classList.toggle('readonly', S.readonly);
   await loadStores();
-  if (!S.stores.length) location.hash = '#/settings';
+  if (!S.stores.length && !S.readonly) location.hash = '#/settings';
 }
 (async () => {
   const { data } = await sb.auth.getSession();

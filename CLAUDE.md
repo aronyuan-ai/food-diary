@@ -32,12 +32,14 @@
 - **Repo**：github.com/aronyuan-ai/food-diary（public；只放程式，不放個人資料）
   - `docs/`：App（index.html、app.js、style.css、sw.js、config.js、manifest、icons）
   - `supabase/01_schema.sql`：資料庫結構（使用者已在 SQL Editor 執行過）
+  - `supabase/02_viewers.sql`：唯讀檢視者（見下）
   - `tools/`：資料整理用的 Python 腳本（說明見下）
   - `.github/workflows/keepalive.yml`：每 3 天 ping Supabase，避免免費專案 7 天沒用被暫停
 - **Supabase**：`https://uwxxhbzxrgwvdcqmohzu.supabase.co`，publishable key 在 `docs/config.js`
   - 表：`stores`（店家）、`visits`（每次造訪，含 FB 貼文時間戳 `fb_post_ts` 防重複）、`photos`
   - Storage bucket `photos`（私人），路徑 `<user_id>/<檔名>.webp`；FB 照片檔名為 `fb_<原檔名>.webp`
   - RLS：每列只有 `user_id = auth.uid()` 可讀寫。登入方式 Email + 密碼；**註冊已請使用者關閉**
+  - **唯讀檢視者**（2026-10-25）：`supabase/02_viewers.sql` 建 `viewers(owner_id, viewer_id)` 表與 `can_view()` 函式，三張表與照片檔案加「檢視者可讀」政策，寫入仍只限本人。檢視者帳號由使用者在 Supabase「Authentication → Users → Add user」建立，再執行該 SQL 檔最下面的 insert（換 Email）。App 啟動時查 `viewers` 決定 `S.readonly`：隱藏新增分頁、評分改為唯讀、隱藏修改資料／再訪／照片封面與刪除、更多頁只剩帳號
   - Claude **沒有**也**不應索取** secret key 或資料庫密碼。資料寫入一律透過 App 以使用者身分進行（匯入檔 → App「更多」頁匯入）
 - **Google Maps Platform**（使用者的 Google Cloud 專案「心肝美食帳」）
   - App 用金鑰在 `docs/config.js`，限制：網站 `https://aronyuan-ai.github.io/*`，API：Maps JavaScript API、Places API (New)

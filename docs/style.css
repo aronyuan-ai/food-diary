@@ -149,3 +149,7 @@ textarea{min-height:96px;resize:vertical}
 .vbar .btn{background:#1d2721;color:#fff;border-color:#3a4a40}
 .vbar .btn.danger{color:#f07a6e;border-color:#f07a6e}
 .vnote{color:#c9d3cc;font-size:13px;margin:0;text-align:center}
+
+/* 唯讀帳號：隱藏新增 */
+body.readonly .tabbar{grid-template-columns:repeat(4,1fr)}
+body.readonly .tabbar a.add{display:none}
