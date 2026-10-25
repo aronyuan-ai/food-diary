@@ -145,9 +145,11 @@ function route() {
   const h = location.hash.slice(1) || '/';
   const [, a, b] = h.split('/');
   document.querySelectorAll('.tabbar a').forEach(x => x.toggleAttribute('aria-current', false));
-  const tab = a === 'map' ? 'map' : a === 'add' ? 'add' : a === 'settings' ? 'settings' : a === 'store' ? '' : 'list';
+  const tab = a === 'map' ? 'map' : a === 'add' ? 'add' : a === 'settings' ? 'settings' : a === 'magazine' ? 'magazine' : (a === 'store' || a === 'print') ? '' : 'list';
   if (tab) $(`.tabbar a[data-tab="${tab}"]`).setAttribute('aria-current', 'page');
   if (a === 'store' && b) return viewStore(decodeURIComponent(b));
+  if (a === 'magazine') return viewMagazine(b ?? null);
+  if (a === 'print') return viewPrint(b || 'all');
   if (a === 'map') return viewMap();
   if (a === 'add') return viewAdd(b ? decodeURIComponent(b) : null);
   if (a === 'settings') return viewSettings();
