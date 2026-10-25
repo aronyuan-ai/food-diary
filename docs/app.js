@@ -470,6 +470,11 @@ function viewSettings() {
 }
 // 店名相似度：去掉空白符號後，互相包含或兩字詞重疊夠多
 function nameMatch(a, b) {
+  const parts = String(a || '').split(/[-－|｜\s]+/).filter(x => x.length >= 2);
+  if (parts.length > 1) return Math.max(nameMatch1(a, b), ...parts.map(x => nameMatch1(x, b)));
+  return nameMatch1(a, b);
+}
+function nameMatch1(a, b) {
   const n = x => (x || '').toLowerCase().replace(/[\s·・．.\-－_()（）【】&'’|｜]/g, '').replace(/(總店|本店|創始店|旗艦店|分店|門市)$/, '');
   a = n(a); b = n(b); if (!a || !b) return 0;
   if (a.includes(b) || b.includes(a)) return Math.min(a.length, b.length) >= 2 ? 1 : 0;
@@ -491,9 +496,10 @@ async function matchGoogle() {
       const req = { textQuery: near ? s.name : s.name + (area ? ' ' + area : ' 台灣'), fields: ['id', 'displayName', 'location'], maxResultCount: 3, language: 'zh-TW' };
       if (near) req.locationBias = { center: { lat: s.lat, lng: s.lng }, radius: 800 };
       const { places } = await Place.searchByText(req);
-      const best = (places || []).map(p => ({ p, sc: nameMatch(s.name, p.displayName) - (near ? Math.min(1, dist({ lat: s.lat, lng: s.lng }, { lat: p.location.lat(), lng: p.location.lng() }) / 3) : 0) })).sort((x, y) => y.sc - x.sc)[0];
-      // 有座標：名稱夠像而且距離 3 公里內；沒座標：名稱幾乎一樣才接受
-      if (best && best.sc >= (near ? 0.6 : 0.95)) {
+      const scored = (places || []).map(p => { const nm = nameMatch(s.name, p.displayName); const d = near ? dist({ lat: s.lat, lng: s.lng }, { lat: p.location.lat(), lng: p.location.lng() }) : 0; return { p, nm, d, ok: near ? ((nm >= 0.6 && d < 1.5) || (nm >= 0.3 && d < 0.2)) : nm >= 0.95 }; });
+      // 有座標：名稱夠像且 1.5 公里內，或就在 200 公尺內且名稱部分相同；沒座標：名稱幾乎一樣才接受
+      const best = scored.filter(x => x.ok).sort((x, y) => (y.nm - y.d / 3) - (x.nm - x.d / 3))[0];
+      if (best) {
         const patch = { google_place_id: best.p.id, lat: best.p.location.lat(), lng: best.p.location.lng(), google_fetched_at: today };
         if (!near) { Object.assign(patch, await osmDistrict(patch.lat, patch.lng)); patch.loc_source = 'google'; }
         await saveStore(s.id, patch); ok++;
