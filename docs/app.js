@@ -164,7 +164,8 @@ function filtered() {
   let r = S.stores.filter(s => {
     if (!visible(s)) return f.st === 'ns' && s.status === 'not_store';
     if (f.st === 'ns') return false;
-    if (f.st && s.status !== f.st) return false;
+    if (f.st === 'nog') { if (s.google_place_id) return false; }
+    else if (f.st && s.status !== f.st) return false;
     if (f.cu && s.cuisine !== f.cu) return false;
     if (f.area && areaOf(s) !== f.area && s.city !== f.area) return false;
     if (f.rate === 'none' && s.rating) return false;
@@ -182,7 +183,7 @@ function areas() {
   return [...c].sort((a, b) => b[1] - a[1]).map(x => x[0]);
 }
 function rowHtml(s) {
-  const meta = [s.cuisine, areaOf(s), s.visit_count > 1 ? `去過 ${s.visit_count} 次` : ''].filter(Boolean).join(' · ');
+  const meta = [s.cuisine, areaOf(s), s.visit_count > 1 ? `去過 ${s.visit_count} 次` : ''].filter(Boolean).join(' · ') + (S.f.st === 'nog' ? (s.lat != null ? '・有位置' : '・沒有位置') : '');
   const right = s._d != null && S.f.sort === 'near' ? (s._d < 1 ? Math.round(s._d * 1000) + ' m' : s._d.toFixed(1) + ' km') : (s.last_visit || '').slice(0, 7);
   return `<a class="row" href="#/store/${encodeURIComponent(s.id)}"><span class="badge" style="background:${color(s.cuisine)}">${esc((s.cuisine || '其')[0])}</span>
     <span class="main"><span class="nm">${esc(s.name)}</span><span class="meta">${starsMini(s.rating)} ${esc(meta)}${s.status === 'unconfirmed' ? ' <span class="tag amber">未確認</span>' : ''}</span></span>
@@ -199,7 +200,7 @@ function viewList() {
       ${sel('fCu', '菜系', [['', '全部菜系'], ...CUISINES.map(c => [c, c])], f.cu)}
       ${sel('fArea', '地區', [['', '全部地區'], ...areas().map(a => [a, a])], f.area)}
       ${sel('fRate', '評分', [['', '全部評分'], ['4.5', '4.5 星以上'], ['4', '4 星以上'], ['3', '3 星以上'], ['none', '還沒評分']], f.rate)}
-      ${sel('fSt', '狀態', [['', '全部'], ['confirmed', '已確認'], ['unconfirmed', '未確認'], ['ns', '已隱藏的非店家']], f.st)}
+      ${sel('fSt', '狀態', [['', '全部'], ['confirmed', '已確認'], ['unconfirmed', '未確認'], ['nog', '沒有 Google 地點'], ['ns', '已隱藏的非店家']], f.st)}
     </div></div>
     <p class="summary" id="sum"></p><ul class="list" id="list"></ul><div id="moreBox"></div></div>`;
   $('#fSort').value = f.sort;
