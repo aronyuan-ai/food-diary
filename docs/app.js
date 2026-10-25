@@ -443,7 +443,7 @@ function viewSettings() {
       <input type="file" id="imp" accept=".json,application/json"><div class="progress" style="margin-top:10px" hidden id="impBar"><i></i></div><p class="msg" id="impMsg"></p></div>
     <div class="card"><h3>從 FB 匯出檔匯入照片</h3><p class="muted" style="margin:0 0 10px;font-size:14px">請用電腦的 Chrome 或 Edge。先選照片對照檔，再選 FB 匯出檔解壓縮後的資料夾。照片會在你的電腦上壓縮後直接上傳；已上傳的會自動跳過，中斷了可以重跑。</p>
       <label class="field"><span>1. 照片對照檔（.json）</span><input type="file" id="phMap" accept=".json,application/json"></label>
-      <label class="field" style="margin-top:8px"><span>2. FB 匯出檔資料夾</span><input type="file" id="phDir" webkitdirectory directory multiple disabled></label>
+      <label class="field" style="margin-top:8px"><span>2. FB 匯出檔資料夾 <span class="muted" id="phDirHint">（先完成第 1 步才能選）</span></span><input type="file" id="phDir" webkitdirectory directory multiple disabled></label>
       <div class="progress" style="margin-top:10px" hidden id="phBar"><i></i></div><p class="msg" id="phMsg"></p></div>
     <div class="card"><h3>帳號</h3><p style="margin:0 0 10px;font-size:14px">${esc(S.user.email)}</p><div class="actions"><button class="btn" id="reload" type="button">重新同步</button><button class="btn danger" id="out" type="button">登出</button></div></div>
     <p class="muted" style="font-size:12px;text-align:center">地圖與地點資料 © Google・行政區資料 © OpenStreetMap contributors</p></div>`;
@@ -451,9 +451,13 @@ function viewSettings() {
   $('#reload').onclick = () => loadStores(true).then(() => toast('已同步'));
   $('#imp').onchange = e => importFile(e.target.files[0]);
   let phMap = null;
+  if (!('webkitdirectory' in document.createElement('input')) || /iPhone|iPad|Android/i.test(navigator.userAgent)) {
+    $('#phMap').disabled = true; $('#phDirHint').textContent = '';
+    $('#phMsg').textContent = '這個瀏覽器不能選整個資料夾。請改用電腦的 Chrome 或 Edge 開啟 App。';
+  }
   $('#phMap').onchange = async e => {
     const m = $('#phMsg'); m.className = 'msg';
-    try { phMap = JSON.parse(await e.target.files[0].text()); if (!Array.isArray(phMap.items)) throw 0; $('#phDir').disabled = false; m.className = 'msg ok'; m.textContent = `對照檔有 ${phMap.items.length} 張照片。接著選 FB 匯出檔的資料夾。`; }
+    try { phMap = JSON.parse(await e.target.files[0].text()); if (!Array.isArray(phMap.items)) throw 0; $('#phDir').disabled = false; $('#phDirHint').textContent = '（現在可以選了）'; m.className = 'msg ok'; m.textContent = `對照檔有 ${phMap.items.length} 張照片。接著選 FB 匯出檔的資料夾。`; }
     catch (err) { m.textContent = '這不是照片對照檔，請確認選的是 Claude 給你的檔案。'; }
   };
   $('#phDir').onchange = e => phMap && importPhotos(phMap, [...e.target.files]);
