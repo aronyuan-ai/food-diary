@@ -51,10 +51,10 @@ function starInput(value, onChange) {
 
 /* ---------- 登入 ---------- */
 let signUpMode = false;
-// 帳號正規化：全形轉半形（中文輸入法）、去掉空白與看不見的字元、轉小寫；沒有 @ 就補 @example.com
+// 帳號正規化：全形轉半形（中文輸入法）、去掉空白與看不見的字元、轉小寫；沒有 @ 就補 config.js 的 LOGIN_DOMAIN
 function loginEmail(raw) {
   const id = String(raw || '').normalize('NFKC').replace(/[\s\u200B-\u200D\u2060\uFEFF]/g, '').replace(/＠/g, '@').toLowerCase();
-  return !id ? '' : id.includes('@') ? id : id + '@example.com';
+  return !id ? '' : id.includes('@') ? id : id + '@' + (CFG.LOGIN_DOMAIN || 'example.com');
 }
 $('#authEmail').addEventListener('input', () => { const e = loginEmail($('#authEmail').value); $('#authAs').textContent = e && !$('#authEmail').value.includes('@') ? `會用 ${e} 登入` : ''; });
 $('#pwEye').onclick = () => { const i = $('#authPw'), show = i.type === 'password'; i.type = show ? 'text' : 'password'; $('#pwEye').textContent = show ? '隱藏' : '顯示'; $('#pwEye').setAttribute('aria-pressed', show); $('#pwEye').setAttribute('aria-label', show ? '隱藏密碼' : '顯示密碼'); i.focus(); };
