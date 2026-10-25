@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>心肝美食帳</title>
+<meta name="theme-color" content="#f6f7f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121815" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="美食帳">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;800&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <section id="auth" class="screen" hidden>
+    <div class="auth-card">
+      <p class="eyebrow">2020 — 今天</p>
+      <h1 class="brand">心肝美食帳</h1>
+      <p class="muted">登入後才能看到你的美食紀錄。</p>
+      <form id="authForm" novalidate>
+        <label class="field"><span>Email</span><input id="authEmail" type="email" autocomplete="email" required></label>
+        <label class="field"><span>密碼（至少 8 個字元）</span><input id="authPw" type="password" autocomplete="current-password" minlength="8" required></label>
+        <button class="btn primary wide" id="authGo" type="submit">登入</button>
+        <button class="btn link" id="authToggle" type="button">第一次使用？建立帳號</button>
+        <p class="msg" id="authMsg" role="status"></p>
+      </form>
+    </div>
+  </section>
+
+  <div id="shell" hidden>
+    <header class="top">
+      <h1 class="brand small" id="topTitle">心肝美食帳</h1>
+      <span class="sync" id="sync" role="status"></span>
+    </header>
+    <main id="view"></main>
+    <nav class="tabbar" aria-label="主選單">
+      <a href="#/" data-tab="list"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>搜尋</a>
+      <a href="#/map" data-tab="map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>地圖</a>
+      <a href="#/add" data-tab="add" class="add"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>新增</a>
+      <a href="#/settings" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>更多</a>
+    </nav>
+  </div>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://unpkg.com/@googlemaps/markerclusterer@2.5.3/dist/index.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
