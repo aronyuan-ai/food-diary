@@ -25,7 +25,7 @@
       <h1 class="brand">心肝美食帳</h1>
       <p class="muted">登入後才能看到你的美食紀錄。</p>
       <form id="authForm" novalidate>
-        <label class="field"><span>帳號或 Email</span><input id="authEmail" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
+        <label class="field"><span>帳號或 Email</span><input id="authEmail" type="text" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="email" required><small class="muted" id="authAs" style="font-size:12px;min-height:1.2em"></small></label>
         <label class="field"><span>密碼（至少 8 個字元）</span><span class="pw"><input id="authPw" type="password" autocomplete="current-password" minlength="8" required><button type="button" class="pw-eye" id="pwEye" aria-label="顯示密碼" aria-pressed="false">顯示</button></span></label>
         <button class="btn primary wide" id="authGo" type="submit">登入</button>
         <button class="btn link" id="authToggle" type="button">第一次使用？建立帳號</button>

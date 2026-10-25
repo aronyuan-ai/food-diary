@@ -51,13 +51,19 @@ function starInput(value, onChange) {
 
 /* ---------- 登入 ---------- */
 let signUpMode = false;
+// 帳號正規化：全形轉半形（中文輸入法）、去掉空白與看不見的字元、轉小寫；沒有 @ 就補 @example.com
+function loginEmail(raw) {
+  const id = String(raw || '').normalize('NFKC').replace(/[\s\u200B-\u200D\u2060\uFEFF]/g, '').replace(/＠/g, '@').toLowerCase();
+  return !id ? '' : id.includes('@') ? id : id + '@example.com';
+}
+$('#authEmail').addEventListener('input', () => { const e = loginEmail($('#authEmail').value); $('#authAs').textContent = e && !$('#authEmail').value.includes('@') ? `會用 ${e} 登入` : ''; });
 $('#pwEye').onclick = () => { const i = $('#authPw'), show = i.type === 'password'; i.type = show ? 'text' : 'password'; $('#pwEye').textContent = show ? '隱藏' : '顯示'; $('#pwEye').setAttribute('aria-pressed', show); $('#pwEye').setAttribute('aria-label', show ? '隱藏密碼' : '顯示密碼'); i.focus(); };
 function showAuth() { $('#auth').hidden = false; $('#shell').hidden = true; }
 $('#authToggle').onclick = () => { signUpMode = !signUpMode; $('#authGo').textContent = signUpMode ? '建立帳號' : '登入'; $('#authToggle').textContent = signUpMode ? '已經有帳號？登入' : '第一次使用？建立帳號'; $('#authMsg').textContent = ''; };
 $('#authForm').onsubmit = async e => {
   e.preventDefault();
   // 只輸入帳號（不含 @）時，對應到 帳號@example.com（example.com 是保留網域，不會寄信到真人）
-  const id = $('#authEmail').value.trim().toLowerCase(), email = id.includes('@') ? id : id + '@example.com', password = $('#authPw').value, m = $('#authMsg');
+  const email = loginEmail($('#authEmail').value), password = $('#authPw').value, m = $('#authMsg');
   m.className = 'msg'; if (!email || password.length < 8) { m.textContent = '請輸入帳號（或 Email）和至少 8 個字元的密碼。'; return; }
   $('#authGo').disabled = true; m.textContent = '處理中…';
   try {

@@ -1,5 +1,5 @@
 // 離線快取：App 本身「先抓網路最新版、失敗才用快取」，所以更新會立刻生效；字型與程式庫用快取加速。資料（Supabase、Google）不快取
-const V='food-v11';
+const V='food-v12';
 const SHELL=['./','index.html','style.css','app.js','magazine.js','magazine.css','config.js','manifest.webmanifest','icons/icon-192.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(V).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));

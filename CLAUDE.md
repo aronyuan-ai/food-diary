@@ -39,7 +39,7 @@
   - 表：`stores`（店家）、`visits`（每次造訪，含 FB 貼文時間戳 `fb_post_ts` 防重複）、`photos`
   - Storage bucket `photos`（私人），路徑 `<user_id>/<檔名>.webp`；FB 照片檔名為 `fb_<原檔名>.webp`
   - RLS：每列只有 `user_id = auth.uid()` 可讀寫。登入方式 Email + 密碼；**註冊已請使用者關閉**
-  - **唯讀檢視者**（2026-10-25）：`supabase/02_viewers.sql` 建 `viewers(owner_id, viewer_id)` 表與 `can_view()` 函式，三張表與照片檔案加「檢視者可讀」政策，寫入仍只限本人。檢視者帳號由使用者在 Supabase「Authentication → Users → Add user」建立，再執行該 SQL 檔最下面的 insert（換 Email）。登入框可只輸入帳號：沒有 @ 時自動補成 `帳號@example.com`（Supabase 一定要 Email；example.com 為保留網域）。這類帳號收不到信，忘記密碼要由使用者在 Supabase「Users」重設。App 啟動時查 `viewers` 決定 `S.readonly`：隱藏新增分頁、評分改為唯讀、隱藏修改資料／再訪／照片封面與刪除、更多頁只剩帳號
+  - **唯讀檢視者**（2026-10-25）：`supabase/02_viewers.sql` 建 `viewers(owner_id, viewer_id)` 表與 `can_view()` 函式，三張表與照片檔案加「檢視者可讀」政策，寫入仍只限本人。檢視者帳號由使用者在 Supabase「Authentication → Users → Add user」建立，再執行該 SQL 檔最下面的 insert（換 Email）。登入框可只輸入帳號：`loginEmail()` 先 NFKC（全形轉半形，Android 中文輸入法會打出全形）、去空白與零寬字元、轉小寫，沒有 @ 時自動補成 `帳號@example.com`，帳號欄下方顯示實際登入的 Email（Supabase 一定要 Email；example.com 為保留網域）。這類帳號收不到信，忘記密碼要由使用者在 Supabase「Users」重設。App 啟動時查 `viewers` 決定 `S.readonly`：隱藏新增分頁、評分改為唯讀、隱藏修改資料／再訪／照片封面與刪除、更多頁只剩帳號
   - Claude **沒有**也**不應索取** secret key 或資料庫密碼。資料寫入一律透過 App 以使用者身分進行（匯入檔 → App「更多」頁匯入）
 - **Google Maps Platform**（使用者的 Google Cloud 專案「心肝美食帳」）
   - App 用金鑰在 `docs/config.js`，限制：網站 `https://aronyuan-ai.github.io/*`，API：Maps JavaScript API、Places API (New)
