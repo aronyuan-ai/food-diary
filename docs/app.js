@@ -130,8 +130,9 @@ async function refreshGoogleCoords() {
 function gmapsLink(s) {
   const q = encodeURIComponent(s.name);
   if (s.google_place_id) return `https://www.google.com/maps/search/?api=1&query=${q}&query_place_id=${encodeURIComponent(s.google_place_id)}`;
-  if (s.lat != null) return `https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`;
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + ' ' + (s.district || s.city || ''))}`;
+  // 沒有 Google 地點時，用店名＋地區搜尋，而不是只給座標
+  const area = s.country && s.country !== '台灣' ? s.country : [s.city, s.district].filter(Boolean).join('');
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.name + (area ? ' ' + area : ''))}`;
 }
 async function osmDistrict(lat, lng) { // 行政區用 OpenStreetMap 反查，不存 Google 的地址
   try { const r = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}&limit=1`); const j = await r.json(); const p = j.features?.[0]?.properties || {}; return { city: p.city || p.county || p.state || null, district: p.district || p.locality || null }; }
@@ -447,11 +448,14 @@ function viewSettings() {
       <label class="field"><span>1. 照片對照檔（.json）</span><input type="file" id="phMap" accept=".json,application/json"></label>
       <label class="field" style="margin-top:8px"><span>2. FB 匯出檔資料夾 <span class="muted" id="phDirHint">（先完成第 1 步才能選）</span></span><input type="file" id="phDir" webkitdirectory directory multiple disabled></label>
       <div class="progress" style="margin-top:10px" hidden id="phBar"><i></i></div><p class="msg" id="phMsg"></p></div>
+    <div class="card"><h3>Google 地點配對</h3><p class="muted" style="margin:0 0 10px;font-size:14px">有 <b id="gmN">${S.stores.filter(s => visible(s) && !s.google_place_id).length}</b> 家店還沒對應到 Google 地圖上的店家，按「在 Google 地圖開啟」時只能用店名搜尋。按下面的按鈕，App 會用每家店的位置在附近找同名的店；店名對得上才會儲存，對不上的保持原樣，可以之後在店家頁「修改資料」手動指定。</p>
+      <button class="btn primary" id="gmGo" type="button">幫沒有 Google 地點的店自動配對</button><div class="progress" style="margin-top:10px" hidden id="gmBar"><i></i></div><p class="msg" id="gmMsg"></p></div>
     <div class="card"><h3>帳號</h3><p style="margin:0 0 10px;font-size:14px">${esc(S.user.email)}</p><div class="actions"><button class="btn" id="reload" type="button">重新同步</button><button class="btn danger" id="out" type="button">登出</button></div></div>
     <p class="muted" style="font-size:12px;text-align:center">地圖與地點資料 © Google・行政區資料 © OpenStreetMap contributors</p></div>`;
   $('#out').onclick = () => sb.auth.signOut();
   $('#reload').onclick = () => loadStores(true).then(() => toast('已同步'));
   $('#imp').onchange = e => importFile(e.target.files[0]);
+  $('#gmGo').onclick = matchGoogle;
   let phMap = null;
   if (!('webkitdirectory' in document.createElement('input')) || /iPhone|iPad|Android/i.test(navigator.userAgent)) {
     $('#phMap').disabled = true; $('#phDirHint').textContent = '';
@@ -463,6 +467,43 @@ function viewSettings() {
     catch (err) { m.textContent = '這不是照片對照檔，請確認選的是 Claude 給你的檔案。'; }
   };
   $('#phDir').onchange = e => phMap && importPhotos(phMap, [...e.target.files]);
+}
+// 店名相似度：去掉空白符號後，互相包含或兩字詞重疊夠多
+function nameMatch(a, b) {
+  const n = x => (x || '').toLowerCase().replace(/[\s·・．.\-－_()（）【】&'’|｜]/g, '').replace(/(總店|本店|創始店|旗艦店|分店|門市)$/, '');
+  a = n(a); b = n(b); if (!a || !b) return 0;
+  if (a.includes(b) || b.includes(a)) return Math.min(a.length, b.length) >= 2 ? 1 : 0;
+  const bg = x => { const r = new Set(); for (let i = 0; i < x.length - 1; i++) r.add(x.slice(i, i + 2)); return r; };
+  const A = bg(a), B = bg(b); let k = 0; A.forEach(x => B.has(x) && k++); return k / Math.max(1, Math.min(A.size, B.size));
+}
+async function matchGoogle() {
+  const btn = $('#gmGo'), m = $('#gmMsg'), bar = $('#gmBar'), fill = bar.firstElementChild;
+  const todo = S.stores.filter(s => visible(s) && !s.google_place_id);
+  if (!todo.length) { m.className = 'msg ok'; m.textContent = '每家店都已經有 Google 地點了。'; return; }
+  btn.disabled = true; bar.hidden = false; m.className = 'msg ok'; m.textContent = '載入 Google…';
+  try { await loadGoogle(); } catch (e) { m.className = 'msg'; m.textContent = 'Google 地圖載入失敗，請稍後再試。'; btn.disabled = false; return; }
+  const { Place } = await google.maps.importLibrary('places');
+  const today = new Date().toISOString().slice(0, 10); let ok = 0, miss = 0, done = 0;
+  for (const s of todo) {
+    try {
+      const near = s.lat != null;
+      const area = s.country && s.country !== '台灣' ? s.country : [s.city, s.district].filter(Boolean).join('');
+      const req = { textQuery: near ? s.name : s.name + (area ? ' ' + area : ' 台灣'), fields: ['id', 'displayName', 'location'], maxResultCount: 3, language: 'zh-TW' };
+      if (near) req.locationBias = { center: { lat: s.lat, lng: s.lng }, radius: 800 };
+      const { places } = await Place.searchByText(req);
+      const best = (places || []).map(p => ({ p, sc: nameMatch(s.name, p.displayName) - (near ? Math.min(1, dist({ lat: s.lat, lng: s.lng }, { lat: p.location.lat(), lng: p.location.lng() }) / 3) : 0) })).sort((x, y) => y.sc - x.sc)[0];
+      // 有座標：名稱夠像而且距離 3 公里內；沒座標：名稱幾乎一樣才接受
+      if (best && best.sc >= (near ? 0.6 : 0.95)) {
+        const patch = { google_place_id: best.p.id, lat: best.p.location.lat(), lng: best.p.location.lng(), google_fetched_at: today };
+        if (!near) { Object.assign(patch, await osmDistrict(patch.lat, patch.lng)); patch.loc_source = 'google'; }
+        await saveStore(s.id, patch); ok++;
+      } else miss++;
+    } catch (e) { miss++; }
+    done++; fill.style.width = (done / todo.length * 100) + '%'; m.textContent = `配對中 ${done} / ${todo.length}：找到 ${ok} 家、對不上 ${miss} 家`;
+    await new Promise(r => setTimeout(r, 120));
+  }
+  m.textContent = `完成：${ok} 家已對應到 Google 地點；${miss} 家對不上，維持原樣（可以在店家頁「修改資料」手動指定）。`;
+  $('#gmN').textContent = S.stores.filter(s => visible(s) && !s.google_place_id).length; btn.disabled = false;
 }
 async function importPhotos(map, files) {
   const m = $('#phMsg'), bar = $('#phBar'), fill = bar.firstElementChild; m.className = 'msg ok'; bar.hidden = false;

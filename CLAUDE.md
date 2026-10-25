@@ -90,6 +90,7 @@ https://claude.ai/artifact/YFjiDnpwFPGTV8u8g8Dxco — 早期用來逐家確認�
    - 印刷：固定 A4 頁（每頁 3×3 家，區域從新的一列開始），頁尾章名＋頁碼，目錄有頁碼，每家附 Google 地圖 QR code；整本約 241 頁（mock 測試），用電腦 Chrome「另存為 PDF」，要勾「背景圖形」
    - 引言只取 App 心得或「只寫一兩家」的 FB 貼文開頭（月報貼文不取）
 3. App 內匯入 FB 新貼文：使用者每隔幾個月從 FB「下載你的資訊」只選「貼文」、日期從上次之後、JSON 格式；App 解析（記得 latin-1 → UTF-8 修正）、以 `fb_post_ts` 去重、已知店名（含別名）自動歸戶、新名稱進「未確認」
+3a. ✅ Google 地點補配對（2026-10-25）：FB 打卡來源的 374 家原本沒有 place_id，「在 Google 地圖開啟」只開座標。`gmapsLink` 改成沒 place_id 時用「店名＋城市行政區」搜尋；「更多」頁新增「幫沒有 Google 地點的店自動配對」（`matchGoogle`：Places JS `Place.searchByText`，有座標時 800m bias、名稱相似 ≥0.6 且距離加權；沒座標時名稱需幾乎相同）。單家可在店家頁「修改資料」→「重新指定 Google 地圖上的位置」手動修
 4. 可考慮：列表顯示封面縮圖、店家合併功能、每季提醒匯入 FB 的排程
 
 ## 與使用者溝通
