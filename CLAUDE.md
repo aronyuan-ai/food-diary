@@ -33,8 +33,9 @@
   - `docs/`：App（index.html、app.js、style.css、sw.js、config.js、manifest、icons）
   - `supabase/01_schema.sql`：資料庫結構（使用者已在 SQL Editor 執行過）
   - `supabase/02_viewers.sql`：唯讀檢視者（見下）
+  - `supabase/03_keepalive.sql`：防暫停心跳（`heartbeat` 表＋`heartbeat()` 函式，anon 可呼叫，只寫時間）
   - `tools/`：資料整理用的 Python 腳本（說明見下）
-  - `.github/workflows/keepalive.yml`：每 3 天 ping Supabase，避免免費專案 7 天沒用被暫停
+  - `.github/workflows/keepalive.yml`：**每天**呼叫 `heartbeat()` 寫入一筆時間（`supabase/03_keepalive.sql`），避免免費專案 7 天沒用被暫停。2026-11-02 事件：原本每 3 天只「讀」一次，Supabase 不算使用，專案在使用者最後使用 10/25 的 7 天後被暫停（網址變成 NXDOMAIN、App 打不開），使用者到後台 Restore 後改成寫入式心跳；排程失敗會顯示紅色並寄信
 - **Supabase**：`https://uwxxhbzxrgwvdcqmohzu.supabase.co`，publishable key 在 `docs/config.js`
   - 表：`stores`（店家）、`visits`（每次造訪，含 FB 貼文時間戳 `fb_post_ts` 防重複）、`photos`
   - Storage bucket `photos`（私人），路徑 `<user_id>/<檔名>.webp`；FB 照片檔名為 `fb_<原檔名>.webp`

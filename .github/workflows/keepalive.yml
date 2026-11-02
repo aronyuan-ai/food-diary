@@ -1,13 +1,20 @@
-# 每 3 天輕量查詢一次 Supabase，避免免費專案因 7 天沒使用而被暫停
+# 每天寫入一次心跳，避免 Supabase 免費專案因「7 天沒有使用」被暫停
+# （只讀取的連線不被算成使用，所以呼叫 heartbeat() 真的寫入一筆；見 supabase/03_keepalive.sql）
 name: keep-supabase-awake
 on:
   schedule:
-    - cron: '17 3 */3 * *'
+    - cron: '17 3 * * *'   # 每天 UTC 03:17（台灣 11:17）
   workflow_dispatch:
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          curl -fsS "https://uwxxhbzxrgwvdcqmohzu.supabase.co/rest/v1/stores?select=id&limit=1" \
-            -H "apikey: sb_publishable_Yp4tKtKRp3Flor10ykXE7Q_OaBbRdZL" -o /dev/null -w "%{http_code}\n"
+      - name: heartbeat
+        run: |
+          URL="https://uwxxhbzxrgwvdcqmohzu.supabase.co"
+          KEY="sb_publishable_Yp4tKtKRp3Flor10ykXE7Q_OaBbRdZL"
+          code=$(curl -sS -o out.txt -w "%{http_code}" -X POST "$URL/rest/v1/rpc/heartbeat" \
+            -H "apikey: $KEY" -H "Content-Type: application/json" -d '{}' || echo 000)
+          echo "heartbeat: $code $(cat out.txt 2>/dev/null)"
+          # 失敗時讓排程顯示紅色，GitHub 會寄信通知
+          [ "$code" = "200" ]
